@@ -1,0 +1,19 @@
+version: "3.9"
+
+services:
+  hh-job-bot:
+    build: .
+    container_name: hh-job-bot
+    restart: always
+    env_file: .env
+    volumes:
+      - bot_data:/data
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  bot_data:
+    driver: local
