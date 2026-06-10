@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     telegram_bot_token: str = ""
     telegram_chat_id: int = 0
 
-    anthropic_api_key: str = ""
+    gemini_api_key: str = ""
 
     search_interval_hours: int = 3
     search_query: str = "C# developer"
@@ -29,7 +29,7 @@ class Settings(BaseSettings):
         required = {
             "TELEGRAM_BOT_TOKEN": self.telegram_bot_token,
             "TELEGRAM_CHAT_ID":   self.telegram_chat_id,
-            "ANTHROPIC_API_KEY":  self.anthropic_api_key,
+            "GEMINI_API_KEY":     self.gemini_api_key,
         }
         missing = [name for name, val in required.items() if not val]
         if missing:

@@ -1,6 +1,6 @@
 # HH.ru Job Bot
 
-Telegram bot that monitors fresh C# developer vacancies on hh.ru, rates each with Claude AI, and generates a ready-to-copy Russian cover letter.
+Telegram bot that monitors fresh C# developer vacancies on hh.ru, rates each with Google Gemini, and generates a ready-to-copy Russian cover letter.
 
 > **Note (2025-12-15):** hh.ru shut down the job-seeker OAuth API. Automatic submission of applications is no longer possible. This bot now uses **only the public, no-auth `GET /vacancies` endpoint** and acts as a curated feed with AI-generated cover letters you can paste manually on the site.
 
@@ -8,14 +8,14 @@ Telegram bot that monitors fresh C# developer vacancies on hh.ru, rates each wit
 
 - Periodic vacancy search via APScheduler (configurable interval)
 - Duplicate detection — each vacancy is sent only once
-- Claude AI rates each vacancy (1–10) and drafts a cover letter tailored to your profile
+- Gemini (`gemini-1.5-flash`, free tier) rates each vacancy (1–10) and drafts a cover letter tailored to your profile
 - Inline buttons: 👍 **Интересно** / 👎 **Не подходит** — saved to SQLite, no external calls
 - `/interesting` command lists everything you bookmarked
 - SQLite persistence in a Docker named volume
 
 ## Stack
 
-Python 3.12 · aiogram 3 · httpx · anthropic SDK · APScheduler · aiosqlite · pydantic-settings
+Python 3.12 · aiogram 3 · httpx · google-generativeai · APScheduler · aiosqlite · pydantic-settings
 
 ---
 
@@ -38,13 +38,13 @@ Send any message to the bot and refresh the URL. Look for `"chat": {"id": 123456
 
 Alternatively, forward a message to [@userinfobot](https://t.me/userinfobot).
 
-### 3. Get an Anthropic API key
+### 3. Get a Gemini API key
 
-Create a key at <https://console.anthropic.com/settings/keys> and copy it.
+Create a key at <https://aistudio.google.com/app/apikey> and copy it. The free tier is more than enough for this bot's request volume.
 
 ### 4. Create `resume.txt`
 
-Drop your full CV into a plain-text file named `resume.txt` in the project root. The whole content is passed to Claude in the system prompt of every fit-score and cover-letter call, so the model can reason about your actual experience instead of a stub.
+Drop your full CV into a plain-text file named `resume.txt` in the project root. The whole content is inlined into the prompt of every fit-score and cover-letter call, so Gemini can reason about your actual experience instead of a stub.
 
 ```bash
 # Recommended format: free-form plain text, Russian or English
@@ -66,7 +66,7 @@ cp .env.example .env
 |---|---|
 | `TELEGRAM_BOT_TOKEN` | Token from @BotFather |
 | `TELEGRAM_CHAT_ID` | Your personal chat ID |
-| `ANTHROPIC_API_KEY` | Claude API key |
+| `GEMINI_API_KEY` | Google AI Studio API key |
 | `SEARCH_INTERVAL_HOURS` | How often to search (default: `3`) |
 | `SEARCH_QUERY` | Search text (default: `C# developer`) |
 | `SEARCH_CITY_ID` | hh.ru area ID (default: `1202` = Novosibirsk) |

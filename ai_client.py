@@ -1,9 +1,8 @@
 import json
 import logging
 from pathlib import Path
-from typing import Optional
 
-import anthropic
+import google.generativeai as genai
 
 from config import settings
 
@@ -15,7 +14,10 @@ _FALLBACK_CANDIDATE = (
     "GitHub Actions, Clean Architecture, CQRS."
 )
 
-_resume_text: Optional[str] = None
+_MODEL_NAME = "gemini-1.5-flash"
+
+_resume_text: str | None = None
+_model: genai.GenerativeModel | None = None
 
 
 def load_resume(path: str | Path) -> None:
@@ -44,24 +46,40 @@ def load_resume(path: str | Path) -> None:
     logger.info("Резюме загружено из %s (%d символов)", p, len(text))
 
 
-def _build_system_prompt() -> str:
+def _get_model() -> genai.GenerativeModel:
+    """Lazy-initialise the Gemini client on first use."""
+    global _model
+    if _model is None:
+        genai.configure(api_key=settings.gemini_api_key)
+        _model = genai.GenerativeModel(_MODEL_NAME)
+        logger.info("Gemini-клиент инициализирован (%s)", _MODEL_NAME)
+    return _model
+
+
+def _build_prompt(title: str, company: str, description: str) -> str:
     if _resume_text:
-        candidate_block = f"Полное резюме кандидата:\n\n{_resume_text}"
+        candidate_section = f"Резюме кандидата:\n{_resume_text}"
     else:
-        candidate_block = f"Кандидат: {_FALLBACK_CANDIDATE}"
+        candidate_section = f"Кандидат: {_FALLBACK_CANDIDATE}"
 
-    return f"""Ты — карьерный помощник.
+    desc = description[:3000] if description else "не указано"
 
-{candidate_block}
+    return f"""Ты помогаешь писать сопроводительные письма для отклика на вакансии.
 
-Получив описание вакансии, ты должен:
-1. Оценить соответствие вакансии профилю кандидата (от 1 до 10), опираясь на конкретные пункты резюме.
-2. Написать персонализированное сопроводительное письмо на русском языке (150–250 слов), которое подчёркивает релевантный опыт кандидата из резюме.
+{candidate_section}
 
-Отвечай СТРОГО в формате JSON без каких-либо других символов:
+Вакансия: {title}
+Компания: {company}
+Описание: {desc}
+
+Задачи:
+1. Оцени соответствие вакансии кандидату по шкале 1-10 и дай краткое обоснование (1-2 предложения), ссылаясь на конкретные пункты резюме.
+2. Напиши персонализированное сопроводительное письмо на русском языке (150–250 слов), которое подчёркивает релевантный опыт кандидата.
+
+Отвечай строго в формате JSON без markdown блоков:
 {{
-  "fit_score": <целое число 1-10>,
-  "fit_reasoning": "<1-2 предложения с обоснованием оценки, ссылающиеся на конкретные навыки/опыт из резюме>",
+  "score": <целое число 1-10>,
+  "reasoning": "<краткое обоснование>",
   "cover_letter": "<текст сопроводительного письма>"
 }}"""
 
@@ -78,33 +96,34 @@ _FALLBACK = {
 }
 
 
+def _strip_fences(raw: str) -> str:
+    """Drop ```json ... ``` wrapping if Gemini ignored the no-markdown rule."""
+    s = raw.strip()
+    if not s.startswith("```"):
+        return s
+    nl = s.find("\n")
+    if nl == -1:
+        return s
+    s = s[nl + 1:]
+    if s.endswith("```"):
+        s = s[:-3]
+    return s.strip()
+
+
 async def analyze_vacancy(title: str, company: str, description: str) -> dict:
-    client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
-    user_msg = (
-        f"Вакансия: {title}\n"
-        f"Компания: {company}\n\n"
-        f"Описание:\n{description[:3000]}"
-    )
+    prompt = _build_prompt(title, company, description)
     try:
-        message = await client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=1024,
-            system=_build_system_prompt(),
-            messages=[{"role": "user", "content": user_msg}],
-        )
-        raw = message.content[0].text.strip()
-        # Strip markdown code fences if present
-        if raw.startswith("```"):
-            raw = raw.split("```")[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
-        result = json.loads(raw)
-        result["fit_score"] = max(1, min(10, int(result.get("fit_score", 5))))
-        return result
+        model = _get_model()
+        response = await model.generate_content_async(prompt)
+        cleaned = _strip_fences(response.text)
+        parsed = json.loads(cleaned)
+        return {
+            "fit_score":     max(1, min(10, int(parsed.get("score", 5)))),
+            "fit_reasoning": str(parsed.get("reasoning", _FALLBACK["fit_reasoning"])),
+            "cover_letter":  str(parsed.get("cover_letter", _FALLBACK["cover_letter"])),
+        }
     except json.JSONDecodeError as exc:
-        logger.error("Не удалось распарсить ответ Claude: %s", exc)
-    except anthropic.APIError as exc:
-        logger.error("Ошибка Anthropic API: %s", exc)
+        logger.error("Не удалось распарсить ответ Gemini: %s", exc)
     except Exception as exc:
-        logger.exception("Неожиданная ошибка при вызове Claude: %s", exc)
+        logger.exception("Ошибка при вызове Gemini: %s", exc)
     return _FALLBACK.copy()
