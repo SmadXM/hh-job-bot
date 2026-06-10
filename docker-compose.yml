@@ -7,6 +7,7 @@ services:
     restart: always
     env_file: .env
     volumes:
+      - ./resume.txt:/app/resume.txt:ro
       - bot_data:/data
     logging:
       driver: "json-file"

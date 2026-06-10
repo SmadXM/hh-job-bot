@@ -12,11 +12,6 @@ class Settings(BaseSettings):
         case_sensitive=False,
     )
 
-    hh_client_id: str = ""
-    hh_client_secret: str = ""
-    hh_access_token: str = ""
-    hh_refresh_token: str = ""
-
     telegram_bot_token: str = ""
     telegram_chat_id: int = 0
 
@@ -32,13 +27,9 @@ class Settings(BaseSettings):
 
     def validate_required(self) -> None:
         required = {
-            "HH_CLIENT_ID": self.hh_client_id,
-            "HH_CLIENT_SECRET": self.hh_client_secret,
-            "HH_ACCESS_TOKEN": self.hh_access_token,
-            "HH_REFRESH_TOKEN": self.hh_refresh_token,
             "TELEGRAM_BOT_TOKEN": self.telegram_bot_token,
-            "TELEGRAM_CHAT_ID": self.telegram_chat_id,
-            "ANTHROPIC_API_KEY": self.anthropic_api_key,
+            "TELEGRAM_CHAT_ID":   self.telegram_chat_id,
+            "ANTHROPIC_API_KEY":  self.anthropic_api_key,
         }
         missing = [name for name, val in required.items() if not val]
         if missing:

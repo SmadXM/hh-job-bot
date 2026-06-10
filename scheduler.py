@@ -2,7 +2,6 @@ import html
 import logging
 import re
 from datetime import datetime
-from typing import Optional
 
 from aiogram import Bot
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -53,8 +52,8 @@ def build_vacancy_card(details: dict, fit_score: int, fit_reasoning: str, cover_
         f"📍 {area}  ·  {sched}\n\n"
         f"{score_icon} <b>Оценка: {fit_score}/10</b>\n"
         f"<i>{html.escape(fit_reasoning)}</i>\n\n"
-        f"📝 <b>Сопроводительное письмо:</b>\n"
-        f"{html.escape(cover_letter)}"
+        f"📝 <b>Сопроводительное письмо</b> <i>(для копирования)</i>:\n"
+        f"<blockquote expandable>{html.escape(cover_letter)}</blockquote>"
     )
 
 
